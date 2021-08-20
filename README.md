@@ -1,2 +1,2 @@
 # ArduPID
-Fast, easy to use PID library for Arduinos
+PID library for Arduinos with greater accuracy than the legacy Arduino PID library
