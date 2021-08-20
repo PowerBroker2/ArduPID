@@ -22,16 +22,16 @@ public:
 
 
 
-	void begin(double* _input,
-		       double* _output,
-		       double* _setpoint,
-		       const double& _p = 0,
-		       const double& _i = 0,
-		       const double& _d = 0,
-		       const pOn& _pOn = P_ON_E,
-		       const dir& _direction = FORWARD,
-		       const unsigned int& _minSamplePeriodMs = 0,
-		       const double& _bias = 0);
+	virtual void begin(double* _input,
+		               double* _output,
+		               double* _setpoint,
+		               const double& _p = 0,
+		               const double& _i = 0,
+		               const double& _d = 0,
+		               const pOn& _pOn = P_ON_E,
+		               const dir& _direction = FORWARD,
+		               const unsigned int& _minSamplePeriodMs = 0,
+		               const double& _bias = 0);
 	void start();
 	void reset();
 	void stop();
@@ -43,6 +43,7 @@ public:
 	void setBias(const double& _bias);
 	void setCoefficients(const double& _p, const double& _i, const double& _d);
 	void setDirection(const dir& _direction);
+	void reverse();
 	void setSampleTime(const unsigned int& _minSamplePeriodMs);
 
 	double B();

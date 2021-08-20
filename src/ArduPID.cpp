@@ -196,6 +196,20 @@ void ArduPID::setDirection(const dir& _direction)
 
 
 
+void ArduPID::reverse()
+{
+	if (direction == FORWARD)
+		direction = BACKWARD;
+	else if (direction == BACKWARD)
+		direction = FORWARD;
+
+	if (modeType == ON)
+		reset();
+}
+
+
+
+
 void ArduPID::setSampleTime(const unsigned int& _minSamplePeriodMs)
 {
 	timer.begin(_minSamplePeriodMs);
