@@ -64,7 +64,7 @@ public:
 	
 	void debug(Stream* stream = &Serial,
 	           const char* controllerName = "controller",
-			   const byte& mask = 0xFF);
+		   const byte& mask = 0xFF);
 
 
 
