@@ -246,3 +246,97 @@ double ArduPID::D()
 {
 	return dOut;
 }
+
+
+
+
+void ArduPID::debug(Stream* stream, const char* controllerName, const byte& mask)
+{
+	if (mask & PRINT_INPUT)
+	{
+		stream->print(controllerName);
+		stream->print("_input ");
+	}
+	
+	if (mask & PRINT_OUTPUT)
+	{
+		stream->print(controllerName);
+		stream->print("_output ");
+	}
+		
+	if (mask & PRINT_SETPOINT)
+	{
+		stream->print(controllerName);
+		stream->print("_setpoint ");
+	}
+		
+	if (mask & PRINT_BIAS)
+	{
+		stream->print(controllerName);
+		stream->print("_bias ");
+	}
+		
+	if (mask & PRINT_P)
+	{
+		stream->print(controllerName);
+		stream->print("_P ");
+	}
+		
+	if (mask & PRINT_I)
+	{
+		stream->print(controllerName);
+		stream->print("_I ");
+	}
+		
+	if (mask & PRINT_D)
+	{
+		stream->print(controllerName);
+		stream->print("_D ");
+	}
+	
+	stream->println();
+		
+	if (mask & PRINT_INPUT)
+	{
+		stream->print(*input);
+		stream->print(" ");
+	}
+	
+	if (mask & PRINT_OUTPUT)
+	{
+		stream->print(*output);
+		stream->print(" ");
+	}
+	
+	if (mask & PRINT_SETPOINT)
+	{
+		stream->print(*setpoint);
+		stream->print(" ");
+	}
+	
+	if (mask & PRINT_BIAS)
+	{
+		stream->print(bias);
+		stream->print(" ");
+	}
+	
+	if (mask & PRINT_P)
+	{
+		stream->print(pOut);
+		stream->print(" ");
+	}
+	
+	if (mask & PRINT_I)
+	{
+		stream->print(iOut);
+		stream->print(" ");
+	}
+	
+	if (mask & PRINT_D)
+	{
+		stream->print(dOut);
+		stream->print(" ");
+	}
+	
+	stream->println();
+}

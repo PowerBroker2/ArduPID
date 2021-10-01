@@ -5,6 +5,17 @@
 
 
 
+const byte PRINT_INPUT    = B1;
+const byte PRINT_OUTPUT   = B10;
+const byte PRINT_SETPOINT = B100;
+const byte PRINT_BIAS     = B1000;
+const byte PRINT_P        = B10000;
+const byte PRINT_I        = B100000;
+const byte PRINT_D        = B1000000;
+
+
+
+
 enum pOn { P_ON_E, P_ON_M };
 enum mode { OFF, ON };
 enum dir { FORWARD, BACKWARD };
@@ -50,6 +61,10 @@ public:
 	double P();
 	double I();
 	double D();
+	
+	void debug(Stream* stream = &Serial,
+	           const char* controllerName = "controller",
+			   const byte& mask = 0xFF);
 
 
 
