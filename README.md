@@ -35,6 +35,7 @@ Next, within the `setup()` function, initialize the controller with the referenc
 ```C++
 void setup()
 {
+  Serial.begin(115200);
   myController.begin(&input, &output, &setpoint, p, i, d);
   
   // ADD MORE CONFIGURATION COMMANDS HERE <--------------------
