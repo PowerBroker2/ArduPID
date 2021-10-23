@@ -8,6 +8,9 @@ PID stands for Proportional, Integral, and Derivative and is a simple type of co
 # How Does it Work?
 See the explanation video [here](https://www.youtube.com/watch?v=OqvrYNJvtaU)
 
+# How to Tune a PID:
+See [here](https://pidexplained.com/how-to-tune-a-pid-controller/)
+
 # How to Use the Library:
 First import the library, instantiate an ArduPID class, and create 6 doubles:
 - Setpoint
