@@ -78,8 +78,8 @@ void ArduPID::compute()
 	if (timer.fire() && modeType == ON)
 	{
 		kp = pIn;
-		ki = iIn * (timer.timeDiff * 1000.0);
-		kd = dIn / (timer.timeDiff * 1000.0);
+		ki = iIn * (timer.timeDiff / 1000.0);
+		kd = dIn / (timer.timeDiff / 1000.0);
 
 		if (direction == BACKWARD)
 		{
