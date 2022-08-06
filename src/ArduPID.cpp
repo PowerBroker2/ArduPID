@@ -103,14 +103,20 @@ void ArduPID::compute()
 		else if (pOnType == P_ON_M)
 			pOut = -kp * dInput;
 
-		iOut += (ki * ((curError + lastError) / 2.0)); // Trapezoidal integration
-		iOut = constrain(iOut, windupMin, windupMax);  // Prevent integral windup
-
 		dOut = -kd * dInput; // Derrivative on measurement
 
+		double iTemp = iOut + (ki * ((curError + lastError) / 2.0)); // Trapezoidal integration
+		iTemp        = constrain(iTemp, windupMin, windupMax);       // Prevent integral windup
+
+		double outTemp = bias + pOut + dOut;                           // Output without integral
+		double iMax    = constrain(outputMax - outTemp, 0, outputMax); // Maximum allowed integral term before saturating output
+		double iMin    = constrain(outTemp - outputMin, outputMin, 0); // Minimum allowed integral term before saturating output
+
+		iOut = constrain(iTemp, iMin, iMax);
 		double newOutput = bias + pOut + iOut + dOut;
-		newOutput        = constrain(newOutput, outputMin, outputMax);
-		*output          = newOutput;
+
+		newOutput = constrain(newOutput, outputMin, outputMax);
+		*output   = newOutput;
 	}
 }
 
@@ -339,4 +345,8 @@ void ArduPID::debug(Stream* stream, const char* controllerName, const byte& mask
 	}
 	
 	stream->println();
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> a1b0fe9e270bc105a547a30fff424b06f26ce231
