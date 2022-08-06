@@ -345,8 +345,4 @@ void ArduPID::debug(Stream* stream, const char* controllerName, const byte& mask
 	}
 	
 	stream->println();
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> a1b0fe9e270bc105a547a30fff424b06f26ce231
