@@ -110,7 +110,7 @@ void ArduPID::compute()
 
 		double outTemp = bias + pOut + dOut;                           // Output without integral
 		double iMax    = constrain(outputMax - outTemp, 0, outputMax); // Maximum allowed integral term before saturating output
-		double iMin    = constrain(outTemp - outputMin, outputMin, 0); // Minimum allowed integral term before saturating output
+		double iMin    = constrain(outputMin + outTemp, outputMin, 0); // Minimum allowed integral term before saturating output
 
 		iOut = constrain(iTemp, iMin, iMax);
 		double newOutput = bias + pOut + iOut + dOut;
