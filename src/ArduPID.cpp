@@ -105,7 +105,7 @@ void ArduPID::compute()
 
 		dOut = -kd * dInput; // Derrivative on measurement
 
-		double iTemp = iOut + (ki * ((curError + lastError) / 2.0)); // Trapezoidal integration
+		double iTemp = (iIn == 0.0) ? 0.0 : iOut + (ki * ((curError + lastError) / 2.0)); // Trapezoidal integration
 		iTemp        = constrain(iTemp, windupMin, windupMax);       // Prevent integral windup
 
 		double outTemp = bias + pOut + dOut;                           // Output without integral
