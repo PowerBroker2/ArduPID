@@ -78,8 +78,13 @@ void ArduPID::compute()
 	if (timer.fire() && modeType == ON)
 	{
 		kp = pIn;
-		ki = iIn * (timer.timeDiff / 1000.0);
-		kd = dIn / (timer.timeDiff / 1000.0);
+		if (timer.timeDiff > 0) {
+		  ki = iIn * (timer.timeDiff / 1000.0);
+		  kd = dIn / (timer.timeDiff / 1000.0); // go to inf if timer.timeDiff == 0
+		} else {
+		  ki = 0.0;
+		  kd = 0.0;
+		}
 
 		if (direction == BACKWARD)
 		{
@@ -110,13 +115,13 @@ void ArduPID::compute()
 
 		double outTemp = bias + pOut + dOut;                           // Output without integral
 		double iMax    = constrain(outputMax - outTemp, 0, outputMax); // Maximum allowed integral term before saturating output
-		double iMin    = constrain(outputMin + outTemp, outputMin, 0); // Minimum allowed integral term before saturating output
+		double iMin    = constrain(outputMin - outTemp, outputMin, 0); // Minimum allowed integral term before saturating output
 
 		iOut = constrain(iTemp, iMin, iMax);
-		double newOutput = bias + pOut + iOut + dOut;
-
-		newOutput = constrain(newOutput, outputMin, outputMax);
-		*output   = newOutput;
+		
+		outTemp += iOut;
+		outTemp = constrain(outTemp, outputMin, outputMax);
+		*output   = outTemp;
 	}
 }
 
