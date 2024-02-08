@@ -73,55 +73,63 @@ void ArduPID::stop()
 
 
 
+void ArduPID::doCompute(ulong timeDiff) {
+    kp = pIn;
+    if (timeDiff > 0) {
+        ki = iIn * (timeDiff / 1000.0);
+        kd = dIn / (timeDiff / 1000.0); // go to inf if timeDiff == 0
+    } else {
+        ki = 0.0;
+        kd = 0.0;
+    }
+
+    if (direction == BACKWARD)
+    {
+        kp *= -1;
+        ki *= -1;
+        kd *= -1;
+    }
+
+    lastInput    = curInput;
+    lastSetpoint = curSetpoint;
+    lastError    = curError;
+
+    curInput    = *input;
+    curSetpoint = *setpoint;
+    curError    = curSetpoint - curInput;
+
+    double dInput = *input - lastInput;
+
+    if (pOnType == P_ON_E)
+        pOut = kp * curError;
+    else if (pOnType == P_ON_M)
+        pOut = -kp * dInput;
+
+    dOut = -kd * dInput; // Derrivative on measurement
+
+    double iTemp = (iIn == 0.0) ? 0.0 : iOut + (ki * ((curError + lastError) / 2.0)); // Trapezoidal integration
+    iTemp        = constrain(iTemp, windupMin, windupMax);       // Prevent integral windup
+
+    double outTemp = bias + pOut + dOut;                           // Output without integral
+    double iMax    = constrain(outputMax - outTemp, 0, outputMax); // Maximum allowed integral term before saturating output
+    double iMin    = constrain(outputMin - outTemp, outputMin, 0); // Minimum allowed integral term before saturating output
+
+    iOut = constrain(iTemp, iMin, iMax);
+
+    outTemp += iOut;
+    outTemp = constrain(outTemp, outputMin, outputMax);
+    *output   = outTemp;
+
+}
+
+
+
+
 void ArduPID::compute()
 {
 	if (timer.fire() && modeType == ON)
 	{
-		kp = pIn;
-		if (timer.timeDiff > 0) {
-		  ki = iIn * (timer.timeDiff / 1000.0);
-		  kd = dIn / (timer.timeDiff / 1000.0); // go to inf if timer.timeDiff == 0
-		} else {
-		  ki = 0.0;
-		  kd = 0.0;
-		}
-
-		if (direction == BACKWARD)
-		{
-			kp *= -1;
-			ki *= -1;
-			kd *= -1;
-		}
-
-		lastInput    = curInput;
-		lastSetpoint = curSetpoint;
-		lastError    = curError;
-
-		curInput    = *input;
-		curSetpoint = *setpoint;
-		curError    = curSetpoint - curInput;
-
-		double dInput = *input - lastInput;
-
-		if (pOnType == P_ON_E)
-			pOut = kp * curError;
-		else if (pOnType == P_ON_M)
-			pOut = -kp * dInput;
-
-		dOut = -kd * dInput; // Derrivative on measurement
-
-		double iTemp = (iIn == 0.0) ? 0.0 : iOut + (ki * ((curError + lastError) / 2.0)); // Trapezoidal integration
-		iTemp        = constrain(iTemp, windupMin, windupMax);       // Prevent integral windup
-
-		double outTemp = bias + pOut + dOut;                           // Output without integral
-		double iMax    = constrain(outputMax - outTemp, 0, outputMax); // Maximum allowed integral term before saturating output
-		double iMin    = constrain(outputMin - outTemp, outputMin, 0); // Minimum allowed integral term before saturating output
-
-		iOut = constrain(iTemp, iMin, iMax);
-		
-		outTemp += iOut;
-		outTemp = constrain(outTemp, outputMin, outputMax);
-		*output   = outTemp;
+        doCompute(timer.timeDiff());
 	}
 }
 

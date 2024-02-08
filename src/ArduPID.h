@@ -47,6 +47,7 @@ public:
 	void reset();
 	void stop();
 	virtual void compute();
+    void doCompute(ulong timeDiff);
 	void setOutputLimits(const double& min, const double& max);
 	void setWindUpLimits(const double& min, const double& max);
 	void setDeadBand(const double& min, const double& max);
