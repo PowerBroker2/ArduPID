@@ -129,7 +129,7 @@ void ArduPID::compute()
 {
 	if (timer.fire() && modeType == ON)
 	{
-        doCompute(timer.timeDiff());
+        doCompute(timer.timeDiff);
 	}
 }
 
