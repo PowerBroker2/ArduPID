@@ -1,56 +1,66 @@
 #include "ArduPID.h"
 
+TeensyPID pid;
 
+float setpoint = 100.0f;
+float input = 0.0f;
+float output = 0.0f;
 
+IntervalTimer controlTimer;
 
-ArduPID myController;
-
-
-
-
-float input;
-float output;
-
-// Arbitrary setpoint and gains - adjust these as fit for your project:
-float setpoint = 512;
-float p = 10;
-float i = 1;
-float d = 0.5;
-
-
-
+void controlLoop()
+{
+    input += output * 0.01f;
+    output = pid.compute(setpoint, input);
+}
 
 void setup()
 {
     Serial.begin(115200);
-    myController.begin(&input, &output, &setpoint, p, i, d);
+    delay(1000);
 
-    // myController.reverse()               // Uncomment if controller output is "reversed"
-    // myController.setSampleTime(10);      // OPTIONAL - will ensure at least 10ms have past between successful compute() calls
-    myController.setOutputLimits(0, 255);
-    myController.setBias(255.0 / 2.0);
-    myController.setWindUpLimits(-10, 10); // Groth bounds for the integral term to prevent integral wind-up
+    pid.begin(
+        2.0f,
+        1.0f,
+        0.1f,
+        0.001f,
+        -255.0f,
+        255.0f,
+        TeensyPID::P_ON_E,
+        TeensyPID::D_ON_M,
+        TeensyPID::FORWARD,
+        0.0f
+    );
 
-    myController.start();
-    // myController.reset();               // Used for resetting the I and D terms - only use this if you know what you're doing
-    // myController.stop();                // Turn off the PID controller (compute() will not do anything until start() is called)
+    pid.setWindupLimits(-200.0f, 200.0f);
+    pid.setDeadband(-0.01f, 0.01f);
+
+    // Choose anti-windup method here:
+    pid.setAntiWindupMode(TeensyPID::CLAMP_HEADROOM);
+    // pid.setAntiWindupMode(TeensyPID::CONDITIONAL_INTEGRATION);
+    // pid.setAntiWindupMode(TeensyPID::BACK_CALCULATION);
+    // pid.setBackCalculationGain(0.5f);
+
+    controlTimer.begin(controlLoop, 1000);
 }
-
-
-
 
 void loop()
 {
-    input = analogRead(A0); // Replace with sensor feedback
+    static elapsedMillis timer;
 
-    myController.compute();
-    myController.debug(&Serial, "myController", PRINT_INPUT    | // Can include or comment out any of these terms to print
-                                                PRINT_OUTPUT   | // in the Serial plotter
-                                                PRINT_SETPOINT |
-                                                PRINT_BIAS     |
-                                                PRINT_P        |
-                                                PRINT_I        |
-                                                PRINT_D);
+    if (timer > 100)
+    {
+        timer = 0;
 
-    analogWrite(3, output); // Replace with plant control signal
+        pid.debug(Serial,
+                  "PID",
+                  TeensyPID::PRINT_INPUT |
+                  TeensyPID::PRINT_OUTPUT |
+                  TeensyPID::PRINT_P |
+                  TeensyPID::PRINT_I |
+                  TeensyPID::PRINT_D,
+                  setpoint,
+                  input,
+                  output);
+    }
 }

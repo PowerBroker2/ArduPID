@@ -1,119 +1,91 @@
 #pragma once
-#include "Arduino.h"
-#include "FireTimer.h"
+#include <Arduino.h>
 
-
-
-
-const byte PRINT_INPUT    = 0b1;
-const byte PRINT_OUTPUT   = 0b10;
-const byte PRINT_SETPOINT = 0b100;
-const byte PRINT_BIAS     = 0b1000;
-const byte PRINT_P        = 0b10000;
-const byte PRINT_I        = 0b100000;
-const byte PRINT_D        = 0b1000000;
-
-
-
-
-enum pOn  { P_ON_E, P_ON_M };
-enum dOn  { D_ON_E, D_ON_M };
-enum mode { OFF, ON };
-enum dir  { FORWARD, BACKWARD };
-
-
-
-
-class ArduPID
+class TeensyPID
 {
 public:
-    float* input;
-    float* output;
-    float* setpoint;
+    enum PMode { P_ON_E, P_ON_M };
+    enum DMode { D_ON_E, D_ON_M };
+    enum Direction { FORWARD = 1, BACKWARD = -1 };
+    enum AntiWindupMode { CLAMP_HEADROOM, CONDITIONAL_INTEGRATION, BACK_CALCULATION };
 
+    // Debug masks
+    static const uint8_t PRINT_INPUT    = 0x01;
+    static const uint8_t PRINT_OUTPUT   = 0x02;
+    static const uint8_t PRINT_SETPOINT = 0x04;
+    static const uint8_t PRINT_BIAS     = 0x08;
+    static const uint8_t PRINT_P        = 0x10;
+    static const uint8_t PRINT_I        = 0x20;
+    static const uint8_t PRINT_D        = 0x40;
 
+    TeensyPID();
 
+    void begin(float kp,
+               float ki,
+               float kd,
+               float dtSeconds,
+               float outMin,
+               float outMax,
+               PMode pMode = P_ON_E,
+               DMode dMode = D_ON_M,
+               Direction direction = FORWARD,
+               float bias = 0.0f);
 
-    virtual void begin(float* _input,
-                       float* _output,
-                       float* _setpoint,
-                       float _p = 0,
-                       float _i = 0,
-                       float _d = 0,
-                       const pOn& _pOn = P_ON_E,
-                       const dOn& _dOn = D_ON_E,
-                       const dir& _direction = FORWARD,
-                       unsigned int _minSamplePeriodMs = 0,
-                       float _bias = 0);
-    void start();
     void reset();
-    void stop();
-    virtual void compute();
-    void doCompute(uint32_t timeDiff);
-    void setOutputLimits(float min,
-                         float max);
-    void setWindUpLimits(float min,
-                         float max);
-    void setDeadBand(float min,
-                     float max);
-    void setPOn(const pOn& _pOn);
-    void setDOn(const dOn& _dOn);
-    void setBias(float _bias);
-    void setCoefficients(float _p,
-                         float _i,
-                         float _d);
-    void setDirection(const dir& _direction);
-    void reverse();
-    void setSampleTime(unsigned int _minSamplePeriodMs);
 
-    float B();
-    float P();
-    float I();
-    float D();
-    
-    void debug(      Stream* stream         = &Serial,
-               const char*   controllerName = "controller",
-                     byte    mask           = 0xFF);
+    void setTunings(float kp, float ki, float kd);
+    void setModes(PMode pMode, DMode dMode);
+    void setOutputLimits(float min, float max);
+    void setWindupLimits(float min, float max);
+    void setDeadband(float min, float max);
+    void setBias(float bias);
+    void setDirection(Direction dir);
+    void setDt(float dtSeconds);
+    void setAntiWindupMode(AntiWindupMode mode);
+    void setBackCalculationGain(float kaw);
 
+    float compute(float setpoint, float input);
 
+    float P() const;
+    float I() const;
+    float D() const;
+    float Bias() const;
 
+    void debug(Stream& stream,
+               const char* name,
+               uint8_t mask,
+               float setpoint,
+               float input,
+               float output);
 
-protected:
-    float bias;
+private:
+    // Mode handlers
+    float pOnError(float error, float dInput);
+    float pOnMeasurement(float error, float dInput);
+    float dOnError(float dError, float dInput);
+    float dOnMeasurement(float dError, float dInput);
 
-    float outputMax = 255;
-    float outputMin = 0;
+    float (TeensyPID::*_computeP)(float, float);
+    float (TeensyPID::*_computeD)(float, float);
 
-    float windupMax = 1000;
-    float windupMin = -1000;
+    // Gains
+    float _kp, _ki, _kd;
+    float _dt;
 
-    float deadBandMax = 0;
-    float deadBandMin = 0;
+    // State
+    float _integral;
+    float _prevError;
+    float _prevInput;
 
-    float curError;
-    float curSetpoint;
-    float curInput;
+    float _pOut, _iOut, _dOut;
+    float _bias;
 
-    float lastError;
-    float lastSetpoint;
-    float lastInput;
+    float _outMin, _outMax;
+    float _windMin, _windMax;
+    float _deadMin, _deadMax;
 
-    float pIn;
-    float iIn;
-    float dIn;
+    AntiWindupMode _antiWindupMode;
+    float _kaw;
 
-    float kp;
-    float ki;
-    float kd;
-
-    float pOut;
-    float iOut;
-    float dOut;
-
-    pOn pOnType;
-    dOn dOnType;
-    mode modeType;
-    dir direction;
-
-    FireTimer timer;
+    Direction _direction;
 };

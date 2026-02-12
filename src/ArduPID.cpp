@@ -1,388 +1,239 @@
 #include "ArduPID.h"
 
-
-
-
-void ArduPID::begin(      float*       _input,
-                          float*       _output,
-                          float*       _setpoint,
-                          float        _p,
-                          float        _i,
-                          float        _d,
-                    const pOn&         _pOn,
-                    const dOn&         _dOn,
-                    const dir&         _direction,
-                          unsigned int _minSamplePeriodMs,
-                          float        _bias)
+TeensyPID::TeensyPID()
 {
-    input    = _input;
-    output   = _output;
-    setpoint = _setpoint;
+    _kp = _ki = _kd = 0.0f;
+    _dt = 0.001f;
 
-    setCoefficients(_p, _i, _d);
-    setPOn(_pOn);
-    setDOn(_dOn);
-    setBias(_bias);
-    setDirection(_direction);
-    setSampleTime(_minSamplePeriodMs);
+    _integral = 0.0f;
+    _prevError = 0.0f;
+    _prevInput = 0.0f;
 
-    modeType = ON;
+    _pOut = _iOut = _dOut = 0.0f;
+
+    _bias = 0.0f;
+
+    _outMin = -1.0f;
+    _outMax = 1.0f;
+
+    _windMin = -1000.0f;
+    _windMax = 1000.0f;
+
+    _deadMin = 0.0f;
+    _deadMax = 0.0f;
+
+    _antiWindupMode = CLAMP_HEADROOM;
+    _kaw = 1.0f;
+
+    _direction = FORWARD;
+
+    setModes(P_ON_E, D_ON_M);
+}
+
+void TeensyPID::begin(float kp,
+                      float ki,
+                      float kd,
+                      float dtSeconds,
+                      float outMin,
+                      float outMax,
+                      PMode pMode,
+                      DMode dMode,
+                      Direction direction,
+                      float bias)
+{
+    setDt(dtSeconds);
+    setDirection(direction);
+    setBias(bias);
+    setOutputLimits(outMin, outMax);
+    setTunings(kp, ki, kd);
+    setModes(pMode, dMode);
     reset();
 }
 
-
-
-
-
-void ArduPID::start()
+void TeensyPID::reset()
 {
-    if (modeType != ON)
-    {
-        modeType = ON;
-        reset();
-    }
+    _integral = 0.0f;
+    _prevError = 0.0f;
+    _prevInput = 0.0f;
 }
 
-
-
-
-void ArduPID::reset()
+void TeensyPID::setTunings(float kp, float ki, float kd)
 {
-    curError    = 0;
-    curSetpoint = 0;
-    curInput    = 0;
-
-    lastError    = 0;
-    lastSetpoint = 0;
-    lastInput    = 0;
-
-    pOut = 0;
-    iOut = 0;
-    dOut = 0;
-
-    timer.start();
+    _kp = kp * (float)_direction;
+    _ki = ki * _dt * (float)_direction;
+    _kd = kd / _dt * (float)_direction;
 }
 
-
-
-
-
-void ArduPID::stop()
+void TeensyPID::setModes(PMode pMode, DMode dMode)
 {
-    if (modeType != OFF)
-        modeType = OFF;
+    _computeP = (pMode == P_ON_E)
+        ? &TeensyPID::pOnError
+        : &TeensyPID::pOnMeasurement;
+
+    _computeD = (dMode == D_ON_E)
+        ? &TeensyPID::dOnError
+        : &TeensyPID::dOnMeasurement;
 }
 
-
-
-
-void ArduPID::doCompute(uint32_t timeDiff)
-{
-    kp = pIn;
-
-    if (timeDiff > 0)
-    {
-        ki = iIn * (timeDiff / 1000.0);
-        kd = dIn * (1000.0 / timeDiff); // go to inf if timeDiff == 0
-    }
-    else
-    {
-        ki = 0.0;
-        kd = 0.0;
-    }
-
-    if (direction == BACKWARD)
-    {
-        kp *= -1;
-        ki *= -1;
-        kd *= -1;
-    }
-
-    lastInput    = curInput;
-    lastSetpoint = curSetpoint;
-    lastError    = curError;
-
-    curInput    = *input;
-    curSetpoint = *setpoint;
-    curError    = curSetpoint - curInput;
-
-    float dInput = *input - lastInput;
-    float dError = curError - lastError;
-
-    if (pOnType == P_ON_E)
-        pOut = kp * curError;
-    else if (pOnType == P_ON_M)
-        pOut = -kp * dInput;
-
-    if (dOnType == D_ON_E)
-        dOut = -kd * dError;
-    else if (dOnType == D_ON_M)
-        dOut = -kd * dInput;
-
-    float iTemp = (iIn == 0.0) ? 0.0 : iOut + (ki * ((curError + lastError) / 2.0)); // Trapezoidal integration
-    iTemp       = constrain(iTemp, windupMin, windupMax);       // Prevent integral windup
-
-    float outTemp = bias + pOut + dOut;                           // Output without integral
-    float iMax    = constrain(outputMax - outTemp, 0, outputMax); // Maximum allowed integral term before saturating output
-    float iMin    = constrain(outputMin - outTemp, outputMin, 0); // Minimum allowed integral term before saturating output
-
-    iOut = constrain(iTemp, iMin, iMax);
-
-    outTemp += iOut;
-    outTemp  = constrain(outTemp, outputMin, outputMax);
-    *output  = outTemp;
-
-}
-
-
-
-
-void ArduPID::compute()
-{
-    if (timer.fire() && modeType == ON)
-    {
-        doCompute(timer.timeDiff);
-    }
-}
-
-
-
-
-void ArduPID::setOutputLimits(float min,
-                              float max)
+void TeensyPID::setOutputLimits(float min, float max)
 {
     if (max > min)
     {
-        outputMax = max;
-        outputMin = min;
-
-        if (modeType == ON)
-            *output = constrain(*output, outputMin, outputMax);
+        _outMin = min;
+        _outMax = max;
     }
 }
 
-
-
-
-void ArduPID::setWindUpLimits(float min,
-                              float max)
+void TeensyPID::setWindupLimits(float min, float max)
 {
     if (max > min)
     {
-        windupMax = max;
-        windupMin = min;
+        _windMin = min;
+        _windMax = max;
     }
 }
 
-
-
-
-void ArduPID::setDeadBand(float min,
-                          float max)
+void TeensyPID::setDeadband(float min, float max)
 {
     if (max >= min)
     {
-        deadBandMax = max;
-        deadBandMin = min;
+        _deadMin = min;
+        _deadMax = max;
     }
 }
 
-
-
-
-void ArduPID::setPOn(const pOn& _pOn)
+void TeensyPID::setBias(float bias)
 {
-    pOnType = _pOn;
+    _bias = bias;
 }
 
-
-
-
-void ArduPID::setDOn(const dOn& _dOn)
+void TeensyPID::setDirection(Direction dir)
 {
-    dOnType = _dOn;
+    _direction = dir;
 }
 
-
-
-
-void ArduPID::setBias(float _bias)
+void TeensyPID::setDt(float dtSeconds)
 {
-    bias = _bias;
+    if (dtSeconds > 0)
+        _dt = dtSeconds;
 }
 
-
-
-
-void ArduPID::setCoefficients(float _p,
-                              float _i,
-                              float _d)
+void TeensyPID::setAntiWindupMode(AntiWindupMode mode)
 {
-    if (_p >= 0 && _i >= 0 && _d >= 0)
-    {
-        pIn = _p;
-        iIn = _i;
-        dIn = _d;
-    }
+    _antiWindupMode = mode;
 }
 
-
-
-
-void ArduPID::setDirection(const dir& _direction)
+void TeensyPID::setBackCalculationGain(float kaw)
 {
-    direction = _direction;
-
-    if (modeType == ON)
-        reset();
+    if (kaw >= 0)
+        _kaw = kaw;
 }
 
-
-
-
-void ArduPID::reverse()
+float TeensyPID::compute(float setpoint, float input)
 {
-    if (direction == FORWARD)
-        direction = BACKWARD;
-    else if (direction == BACKWARD)
-        direction = FORWARD;
+    float error = setpoint - input;
 
-    if (modeType == ON)
-        reset();
+    if (error >= _deadMin && error <= _deadMax)
+        error = 0.0f;
+
+    float dInput = input - _prevInput;
+    float dError = error - _prevError;
+
+    _pOut = (this->*_computeP)(error, dInput);
+    _dOut = (this->*_computeD)(dError, dInput);
+
+    float iTemp = _integral + 0.5f * _ki * (error + _prevError);
+    iTemp = constrain(iTemp, _windMin, _windMax);
+
+    float baseOutput = _bias + _pOut + _dOut;
+    float output = baseOutput + iTemp;
+
+    if (_antiWindupMode == CLAMP_HEADROOM)
+    {
+        float iMax = _outMax - baseOutput;
+        float iMin = _outMin - baseOutput;
+        iTemp = constrain(iTemp, iMin, iMax);
+        output = baseOutput + iTemp;
+        _integral = iTemp;
+    }
+    else if (_antiWindupMode == CONDITIONAL_INTEGRATION)
+    {
+        if (output <= _outMax && output >= _outMin)
+            _integral = iTemp;
+
+        output = baseOutput + _integral;
+    }
+    else if (_antiWindupMode == BACK_CALCULATION)
+    {
+        float unclamped = output;
+
+        if (output > _outMax)
+            output = _outMax;
+        else if (output < _outMin)
+            output = _outMin;
+
+        float correction = _kaw * (output - unclamped);
+        _integral = iTemp + correction;
+    }
+
+    output = constrain(output, _outMin, _outMax);
+
+    _iOut = _integral;
+
+    _prevError = error;
+    _prevInput = input;
+
+    return output;
 }
 
+// --- Mode Implementations ---
 
-
-
-void ArduPID::setSampleTime(unsigned int _minSamplePeriodMs)
+float TeensyPID::pOnError(float error, float)
 {
-    timer.begin(_minSamplePeriodMs);
+    return _kp * error;
 }
 
-
-
-
-float ArduPID::B()
+float TeensyPID::pOnMeasurement(float, float dInput)
 {
-    return bias;
+    return -_kp * dInput;
 }
 
-
-
-
-float ArduPID::P()
+float TeensyPID::dOnError(float dError, float)
 {
-    return pOut;
+    return -_kd * dError;
 }
 
-
-
-
-float ArduPID::I()
+float TeensyPID::dOnMeasurement(float, float dInput)
 {
-    return iOut;
+    return -_kd * dInput;
 }
 
+// --- Accessors ---
 
+float TeensyPID::P() const { return _pOut; }
+float TeensyPID::I() const { return _iOut; }
+float TeensyPID::D() const { return _dOut; }
+float TeensyPID::Bias() const { return _bias; }
 
+// --- Debug ---
 
-float ArduPID::D()
+void TeensyPID::debug(Stream& s,
+                      const char* name,
+                      uint8_t mask,
+                      float setpoint,
+                      float input,
+                      float output)
 {
-    return dOut;
-}
+    s.print(name);
+    s.print(" ");
 
+    if (mask & PRINT_INPUT)    { s.print("IN: ");  s.print(input);    s.print(" "); }
+    if (mask & PRINT_OUTPUT)   { s.print("OUT: "); s.print(output);   s.print(" "); }
+    if (mask & PRINT_SETPOINT) { s.print("SP: ");  s.print(setpoint); s.print(" "); }
+    if (mask & PRINT_BIAS)     { s.print("B: ");   s.print(_bias);    s.print(" "); }
+    if (mask & PRINT_P)        { s.print("P: ");   s.print(_pOut);    s.print(" "); }
+    if (mask & PRINT_I)        { s.print("I: ");   s.print(_iOut);    s.print(" "); }
+    if (mask & PRINT_D)        { s.print("D: ");   s.print(_dOut);    s.print(" "); }
 
-
-
-void ArduPID::debug(      Stream* stream,
-                    const char*   controllerName,
-                          byte    mask)
-{
-    if (mask & PRINT_INPUT)
-    {
-        stream->print(controllerName);
-        stream->print("_input ");
-    }
-    
-    if (mask & PRINT_OUTPUT)
-    {
-        stream->print(controllerName);
-        stream->print("_output ");
-    }
-        
-    if (mask & PRINT_SETPOINT)
-    {
-        stream->print(controllerName);
-        stream->print("_setpoint ");
-    }
-        
-    if (mask & PRINT_BIAS)
-    {
-        stream->print(controllerName);
-        stream->print("_bias ");
-    }
-        
-    if (mask & PRINT_P)
-    {
-        stream->print(controllerName);
-        stream->print("_P ");
-    }
-        
-    if (mask & PRINT_I)
-    {
-        stream->print(controllerName);
-        stream->print("_I ");
-    }
-        
-    if (mask & PRINT_D)
-    {
-        stream->print(controllerName);
-        stream->print("_D ");
-    }
-    
-    stream->println();
-        
-    if (mask & PRINT_INPUT)
-    {
-        stream->print(*input);
-        stream->print(" ");
-    }
-    
-    if (mask & PRINT_OUTPUT)
-    {
-        stream->print(*output);
-        stream->print(" ");
-    }
-    
-    if (mask & PRINT_SETPOINT)
-    {
-        stream->print(*setpoint);
-        stream->print(" ");
-    }
-    
-    if (mask & PRINT_BIAS)
-    {
-        stream->print(bias);
-        stream->print(" ");
-    }
-    
-    if (mask & PRINT_P)
-    {
-        stream->print(pOut);
-        stream->print(" ");
-    }
-    
-    if (mask & PRINT_I)
-    {
-        stream->print(iOut);
-        stream->print(" ");
-    }
-    
-    if (mask & PRINT_D)
-    {
-        stream->print(dOut);
-        stream->print(" ");
-    }
-    
-    stream->println();
+    s.println();
 }
