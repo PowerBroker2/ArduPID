@@ -16,9 +16,10 @@ const byte PRINT_D        = B1000000;
 
 
 
-enum pOn { P_ON_E, P_ON_M };
+enum pOn  { P_ON_E, P_ON_M };
+enum dOn  { D_ON_E, D_ON_M };
 enum mode { OFF, ON };
-enum dir { FORWARD, BACKWARD };
+enum dir  { FORWARD, BACKWARD };
 
 
 
@@ -26,85 +27,93 @@ enum dir { FORWARD, BACKWARD };
 class ArduPID
 {
 public:
-	double* input;
-	double* output;
-	double* setpoint;
+    float* input;
+    float* output;
+    float* setpoint;
 
 
 
 
-	virtual void begin(double* _input,
-		               double* _output,
-		               double* _setpoint,
-		               const double& _p = 0,
-		               const double& _i = 0,
-		               const double& _d = 0,
-		               const pOn& _pOn = P_ON_E,
-		               const dir& _direction = FORWARD,
-		               const unsigned int& _minSamplePeriodMs = 0,
-		               const double& _bias = 0);
-	void start();
-	void reset();
-	void stop();
-	virtual void compute();
-    void doCompute(ulong timeDiff);
-	void setOutputLimits(const double& min, const double& max);
-	void setWindUpLimits(const double& min, const double& max);
-	void setDeadBand(const double& min, const double& max);
-	void setPOn(const pOn& _pOn);
-	void setBias(const double& _bias);
-	void setCoefficients(const double& _p, const double& _i, const double& _d);
-	void setDirection(const dir& _direction);
-	void reverse();
-	void setSampleTime(const unsigned int& _minSamplePeriodMs);
+    virtual void begin(float* _input,
+                       float* _output,
+                       float* _setpoint,
+                       float _p = 0,
+                       float _i = 0,
+                       float _d = 0,
+                       const pOn& _pOn = P_ON_E,
+                       const dOn& _dOn = D_ON_E,
+                       const dir& _direction = FORWARD,
+                       unsigned int _minSamplePeriodMs = 0,
+                       float _bias = 0);
+    void start();
+    void reset();
+    void stop();
+    virtual void compute();
+    void doCompute(uint32_t timeDiff);
+    void setOutputLimits(float min,
+                         float max);
+    void setWindUpLimits(float min,
+                         float max);
+    void setDeadBand(float min,
+                     float max);
+    void setPOn(const pOn& _pOn);
+    void setDOn(const dOn& _dOn);
+    void setBias(float _bias);
+    void setCoefficients(float _p,
+                         float _i,
+                         float _d);
+    void setDirection(const dir& _direction);
+    void reverse();
+    void setSampleTime(unsigned int _minSamplePeriodMs);
 
-	double B();
-	double P();
-	double I();
-	double D();
-	
-	void debug(Stream* stream = &Serial,
-	           const char* controllerName = "controller",
-		       const byte& mask = 0xFF);
+    float B();
+    float P();
+    float I();
+    float D();
+    
+    void debug(      Stream* stream         = &Serial,
+               const char*   controllerName = "controller",
+                     byte    mask           = 0xFF);
 
 
 
 
 protected:
-	double bias;
+    float bias;
 
-	double outputMax = 255;
-	double outputMin = 0;
+    float outputMax = 255;
+    float outputMin = 0;
 
-	double windupMax = 1000;
-	double windupMin = -1000;
+    float windupMax = 1000;
+    float windupMin = -1000;
 
-	double deadBandMax = 0;
-	double deadBandMin = 0;
+    float deadBandMax = 0;
+    float deadBandMin = 0;
 
-	double curError;
-	double curSetpoint;
-	double curInput;
+    float curError;
+    float curSetpoint;
+    float curInput;
 
-	double lastError;
-	double lastSetpoint;
-	double lastInput;
+    float lastError;
+    float lastSetpoint;
+    float lastInput;
 
-	double pIn;
-	double iIn;
-	double dIn;
+    float pIn;
+    float iIn;
+    float dIn;
 
-	double kp;
-	double ki;
-	double kd;
+    float kp;
+    float ki;
+    float kd;
 
-	double pOut;
-	double iOut;
-	double dOut;
+    float pOut;
+    float iOut;
+    float dOut;
 
-	pOn pOnType;
-	mode modeType;
-	dir direction;
+    pOn pOnType;
+    dOn dOnType;
+    mode modeType;
+    dir direction;
 
-	FireTimer timer;
+    FireTimer timer;
 };
