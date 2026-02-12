@@ -5,13 +5,13 @@
 
 
 
-const byte PRINT_INPUT    = B1;
-const byte PRINT_OUTPUT   = B10;
-const byte PRINT_SETPOINT = B100;
-const byte PRINT_BIAS     = B1000;
-const byte PRINT_P        = B10000;
-const byte PRINT_I        = B100000;
-const byte PRINT_D        = B1000000;
+const byte PRINT_INPUT    = 0b1;
+const byte PRINT_OUTPUT   = 0b10;
+const byte PRINT_SETPOINT = 0b100;
+const byte PRINT_BIAS     = 0b1000;
+const byte PRINT_P        = 0b10000;
+const byte PRINT_I        = 0b100000;
+const byte PRINT_D        = 0b1000000;
 
 
 
