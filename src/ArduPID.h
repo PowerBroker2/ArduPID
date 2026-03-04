@@ -1,91 +1,114 @@
 #pragma once
 #include <Arduino.h>
 
-class TeensyPID
+class ArduPID
 {
 public:
-    enum PMode { P_ON_E, P_ON_M };
-    enum DMode { D_ON_E, D_ON_M };
-    enum Direction { FORWARD = 1, BACKWARD = -1 };
-    enum AntiWindupMode { CLAMP_HEADROOM, CONDITIONAL_INTEGRATION, BACK_CALCULATION };
+    enum PMode        { P_ON_E,      P_ON_M };
+    enum DMode        { D_ON_E,      D_ON_M };
+    enum AntiWindMode { NONE,        BACK_CALC, CLEGG };
+    enum Direction    { FORWARD = 1, BACKWARD = -1 };
+
+    struct Config
+    {
+        PMode        pMode;
+        DMode        dMode;
+        AntiWindMode aWMode;
+        Direction    direction;
+
+        float pModeMix;
+    
+        uint32_t dt;
+
+        float kp;
+        float ki;
+        float kd;
+        float kaw;
+
+        float pMin;
+        float pMax;
+        float iMin;
+        float iMax;
+        float dMin;
+        float dMax;
+
+        float outMin;
+        float outMax;
+    };
+
+    struct Signals
+    {
+        uint32_t prevT;
+        uint32_t currT;
+
+        float error;
+        float prevError;
+
+        float input;
+        float prevInput;
+
+        float setpoint;
+        float out;
+        float p;
+        float i;
+        float d;
+    };
 
     // Debug masks
-    static const uint8_t PRINT_INPUT    = 0x01;
-    static const uint8_t PRINT_OUTPUT   = 0x02;
-    static const uint8_t PRINT_SETPOINT = 0x04;
-    static const uint8_t PRINT_BIAS     = 0x08;
-    static const uint8_t PRINT_P        = 0x10;
-    static const uint8_t PRINT_I        = 0x20;
-    static const uint8_t PRINT_D        = 0x40;
+    static const uint16_t PRINT_INPUT    = 0x1 << 0;
+    static const uint16_t PRINT_OUTPUT   = 0x1 << 1;
+    static const uint16_t PRINT_SETPOINT = 0x1 << 2;
+    static const uint16_t PRINT_KP       = 0x1 << 3;
+    static const uint16_t PRINT_KI       = 0x1 << 4;
+    static const uint16_t PRINT_KD       = 0x1 << 5;
+    static const uint16_t PRINT_P        = 0x1 << 6;
+    static const uint16_t PRINT_I        = 0x1 << 7;
+    static const uint16_t PRINT_D        = 0x1 << 8;
 
-    TeensyPID();
-
-    void begin(float kp,
-               float ki,
-               float kd,
-               float dtSeconds,
-               float outMin,
-               float outMax,
-               PMode pMode = P_ON_E,
-               DMode dMode = D_ON_M,
-               Direction direction = FORWARD,
-               float bias = 0.0f);
+    ArduPID();
 
     void reset();
 
-    void setTunings(float kp, float ki, float kd);
-    void setModes(PMode pMode, DMode dMode);
+    void setTunings(float _kp, float _ki, float _kd);
+    void setAntiWindupGain(float _kaw);
+    void setPMode(PMode _pMode);
+    void setPercentPonE(float p);
+    void setPercentPonM(float p);
+    void setDMode(DMode _dMode);
+    void setAntiWindMode(AntiWindMode _aWMode);
     void setOutputLimits(float min, float max);
-    void setWindupLimits(float min, float max);
-    void setDeadband(float min, float max);
-    void setBias(float bias);
+    void setPLimits(float min, float max);
+    void setILimits(float min, float max);
+    void setDLimits(float min, float max);
     void setDirection(Direction dir);
-    void setDt(float dtSeconds);
-    void setAntiWindupMode(AntiWindupMode mode);
-    void setBackCalculationGain(float kaw);
+    void setDtUs(uint32_t _dt);
+    void setDtMs(float _dt);
+    void setDtS(float _dt);
+    void setSetpoint(float _setpoint);
 
-    float compute(float setpoint, float input);
+    float compute(float _input);
 
-    float P() const;
-    float I() const;
-    float D() const;
-    float Bias() const;
+    float getkp()       const;
+    float getki()       const;
+    float getkd()       const;
+    float getP()        const;
+    float getI()        const;
+    float getD()        const;
+    float getInput()    const;
+    float getSetpoint() const;
+    float getOutput()   const;
+    float getDtUs()     const;
+    float getDtMs()     const;
+    float getDtS()      const;
 
-    void debug(Stream& stream,
-               const char* name,
-               uint8_t mask,
-               float setpoint,
-               float input,
-               float output);
+    void debug(      Stream& stream,
+               const char*   name,
+                     uint16_t mask,
+                     float   setpoint,
+                     float   input,
+                     float   output);
 
 private:
-    // Mode handlers
-    float pOnError(float error, float dInput);
-    float pOnMeasurement(float error, float dInput);
-    float dOnError(float dError, float dInput);
-    float dOnMeasurement(float dError, float dInput);
-
-    float (TeensyPID::*_computeP)(float, float);
-    float (TeensyPID::*_computeD)(float, float);
-
-    // Gains
-    float _kp, _ki, _kd;
-    float _dt;
-
-    // State
-    float _integral;
-    float _prevError;
-    float _prevInput;
-
-    float _pOut, _iOut, _dOut;
-    float _bias;
-
-    float _outMin, _outMax;
-    float _windMin, _windMax;
-    float _deadMin, _deadMax;
-
-    AntiWindupMode _antiWindupMode;
-    float _kaw;
-
-    Direction _direction;
+    Config  config;
+    Signals signals;
 };

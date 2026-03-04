@@ -1,239 +1,229 @@
 #include "ArduPID.h"
+#include "ArduHelpers.h"
 
-TeensyPID::TeensyPID()
+ArduPID::ArduPID()
 {
-    _kp = _ki = _kd = 0.0f;
-    _dt = 0.001f;
-
-    _integral = 0.0f;
-    _prevError = 0.0f;
-    _prevInput = 0.0f;
-
-    _pOut = _iOut = _dOut = 0.0f;
-
-    _bias = 0.0f;
-
-    _outMin = -1.0f;
-    _outMax = 1.0f;
-
-    _windMin = -1000.0f;
-    _windMax = 1000.0f;
-
-    _deadMin = 0.0f;
-    _deadMax = 0.0f;
-
-    _antiWindupMode = CLAMP_HEADROOM;
-    _kaw = 1.0f;
-
-    _direction = FORWARD;
-
-    setModes(P_ON_E, D_ON_M);
+    
 }
 
-void TeensyPID::begin(float kp,
-                      float ki,
-                      float kd,
-                      float dtSeconds,
-                      float outMin,
-                      float outMax,
-                      PMode pMode,
-                      DMode dMode,
-                      Direction direction,
-                      float bias)
+void ArduPID::reset()
 {
-    setDt(dtSeconds);
-    setDirection(direction);
-    setBias(bias);
-    setOutputLimits(outMin, outMax);
-    setTunings(kp, ki, kd);
-    setModes(pMode, dMode);
-    reset();
+    
 }
 
-void TeensyPID::reset()
+void ArduPID::setTunings(float _kp, float _ki, float _kd)
 {
-    _integral = 0.0f;
-    _prevError = 0.0f;
-    _prevInput = 0.0f;
+    // TODO: Force abs() instead of early return?
+    if ((_kp < 0) || (_ki < 0) || (_kd < 0))
+        return;
+
+    config.kp = _kp;
+    config.ki = _ki * (float)config.dt / 1e6;
+    config.kd = _kd * 1e6              / (float)config.dt;
 }
 
-void TeensyPID::setTunings(float kp, float ki, float kd)
+void ArduPID::setAntiWindupGain(float _kaw)
 {
-    _kp = kp * (float)_direction;
-    _ki = ki * _dt * (float)_direction;
-    _kd = kd / _dt * (float)_direction;
+    if (_kaw < 0)
+        return;
+    
+    config.kaw = _kaw * (float)config.dt / 1e6;
 }
 
-void TeensyPID::setModes(PMode pMode, DMode dMode)
+void ArduPID::setPMode(PMode _pMode)
 {
-    _computeP = (pMode == P_ON_E)
-        ? &TeensyPID::pOnError
-        : &TeensyPID::pOnMeasurement;
+    config.pMode = _pMode;
 
-    _computeD = (dMode == D_ON_E)
-        ? &TeensyPID::dOnError
-        : &TeensyPID::dOnMeasurement;
+    if (_pMode == PMode::P_ON_E)
+        config.pModeMix = 1.0;
+    else
+        config.pModeMix = 0.0;
 }
 
-void TeensyPID::setOutputLimits(float min, float max)
+void ArduPID::setPercentPonE(float p)
+{
+    config.pModeMix = constrain_val(p / 100.0, 0, 1);
+}
+
+void ArduPID::setPercentPonM(float p)
+{
+    config.pModeMix = constrain_val(1.0 - (p / 100.0), 0, 1);
+}
+
+void ArduPID::setDMode(DMode _dMode)
+{
+    config.dMode = _dMode;
+}
+
+void ArduPID::setAntiWindMode(AntiWindMode _aWMode)
+{
+    config.aWMode = _aWMode;
+}
+
+void ArduPID::setOutputLimits(float min, float max)
 {
     if (max > min)
     {
-        _outMin = min;
-        _outMax = max;
+        config.outMin = min;
+        config.outMax = max;
     }
 }
 
-void TeensyPID::setWindupLimits(float min, float max)
+void ArduPID::setPLimits(float min, float max)
 {
     if (max > min)
     {
-        _windMin = min;
-        _windMax = max;
+        config.pMin = min;
+        config.pMax = max;
     }
 }
 
-void TeensyPID::setDeadband(float min, float max)
+void ArduPID::setILimits(float min, float max)
 {
-    if (max >= min)
+    if (max > min)
     {
-        _deadMin = min;
-        _deadMax = max;
+        config.iMin = min;
+        config.iMax = max;
     }
 }
 
-void TeensyPID::setBias(float bias)
+void ArduPID::setDLimits(float min, float max)
 {
-    _bias = bias;
-}
-
-void TeensyPID::setDirection(Direction dir)
-{
-    _direction = dir;
-}
-
-void TeensyPID::setDt(float dtSeconds)
-{
-    if (dtSeconds > 0)
-        _dt = dtSeconds;
-}
-
-void TeensyPID::setAntiWindupMode(AntiWindupMode mode)
-{
-    _antiWindupMode = mode;
-}
-
-void TeensyPID::setBackCalculationGain(float kaw)
-{
-    if (kaw >= 0)
-        _kaw = kaw;
-}
-
-float TeensyPID::compute(float setpoint, float input)
-{
-    float error = setpoint - input;
-
-    if (error >= _deadMin && error <= _deadMax)
-        error = 0.0f;
-
-    float dInput = input - _prevInput;
-    float dError = error - _prevError;
-
-    _pOut = (this->*_computeP)(error, dInput);
-    _dOut = (this->*_computeD)(dError, dInput);
-
-    float iTemp = _integral + 0.5f * _ki * (error + _prevError);
-    iTemp = constrain(iTemp, _windMin, _windMax);
-
-    float baseOutput = _bias + _pOut + _dOut;
-    float output = baseOutput + iTemp;
-
-    if (_antiWindupMode == CLAMP_HEADROOM)
+    if (max > min)
     {
-        float iMax = _outMax - baseOutput;
-        float iMin = _outMin - baseOutput;
-        iTemp = constrain(iTemp, iMin, iMax);
-        output = baseOutput + iTemp;
-        _integral = iTemp;
+        config.dMin = min;
+        config.dMax = max;
     }
-    else if (_antiWindupMode == CONDITIONAL_INTEGRATION)
+}
+
+void ArduPID::setDirection(Direction dir)
+{
+    config.direction = dir;
+}
+
+void ArduPID::setDtUs(uint32_t _dt)
+{
+    config.dt = _dt;
+}
+
+void ArduPID::setDtMs(float _dt)
+{
+    if (_dt > 0)
+        config.dt = _dt * 1e3;
+}
+
+void ArduPID::setDtS(float _dt)
+{
+    if (_dt > 0)
+        config.dt = _dt * 1e6;
+}
+
+void ArduPID::setSetpoint(float _setpoint)
+{
+    signals.setpoint = _setpoint;
+}
+
+float ArduPID::compute(float input)
+{
+    signals.input = input;
+    signals.currT = micros();
+
+    if ((signals.currT - signals.prevT) < config.dt)
+        return signals.out;
+
+    signals.prevT = signals.currT;
+
+    signals.error = signals.setpoint - signals.input;
+    float dInput  = signals.input    - signals.prevInput;
+    float dError  = signals.error    - signals.prevError;
+
+
+
+
+    // TODO: incorporate mode mixing
+    if (config.pMode == PMode::P_ON_E)
+        signals.p = config.kp * signals.error;
+    else
+        signals.p -= config.kp * dInput;
+    
+    if (config.pMin != config.pMax)
+        signals.p = constrain_val(signals.p, config.pMin, config.pMax);
+
+
+
+
+    signals.i += config.ki * signals.error;
+
+    if (config.aWMode == AntiWindMode::BACK_CALC)
     {
-        if (output <= _outMax && output >= _outMin)
-            _integral = iTemp;
-
-        output = baseOutput + _integral;
+        float dActuator = signals.out - signals.input;
+        signals.i -= config.kaw * dActuator;
     }
-    else if (_antiWindupMode == BACK_CALCULATION)
+    else if (config.aWMode == AntiWindMode::CLEGG)
     {
-        float unclamped = output;
-
-        if (output > _outMax)
-            output = _outMax;
-        else if (output < _outMin)
-            output = _outMin;
-
-        float correction = _kaw * (output - unclamped);
-        _integral = iTemp + correction;
+        if ((signals.error == 0)                              ||
+            ((signals.error < 0) && (signals.prevError >= 0)) ||
+            ((signals.error > 0) && (signals.prevError <= 0)))
+            signals.i = 0;
     }
 
-    output = constrain(output, _outMin, _outMax);
+    if (config.iMin != config.iMax)
+        signals.i = constrain_val(signals.i, config.iMin, config.iMax);
 
-    _iOut = _integral;
 
-    _prevError = error;
-    _prevInput = input;
 
-    return output;
+
+    if (config.dMode == DMode::D_ON_E)
+        signals.d = -config.kd * dError;
+    else
+        signals.d = -config.kd * dInput;
+
+    if (config.dMin != config.dMax)
+        signals.d = constrain_val(signals.d, config.dMin, config.dMax);
+    
+
+
+
+    signals.out = signals.p + signals.i + signals.d;
+
+    if (config.outMin != config.outMax)
+        signals.out = constrain_val(signals.out, config.outMin, config.outMax);
+    
+
+
+
+    signals.prevError = signals.error;
+    signals.prevInput = signals.input;
+
+    return signals.out;
 }
 
-// --- Mode Implementations ---
+float ArduPID::getkp()       const { return config.kp;                                       }
+float ArduPID::getki()       const { return config.ki / (float)config.dt * 1e6;              }
+float ArduPID::getkd()       const { return config.kd / 1e6              * (float)config.dt; }
+float ArduPID::getP()        const { return signals.p;                                       }
+float ArduPID::getI()        const { return signals.i;                                       }
+float ArduPID::getD()        const { return signals.d;                                       }
+float ArduPID::getInput()    const { return signals.input;                                   }
+float ArduPID::getSetpoint() const { return signals.setpoint;                                }
+float ArduPID::getOutput()   const { return signals.out;                                     }
 
-float TeensyPID::pOnError(float error, float)
+void ArduPID::debug(      Stream& s,
+                    const char*   name,
+                          uint16_t mask,
+                          float   setpoint,
+                          float   input,
+                          float   output)
 {
-    return _kp * error;
-}
+    // s.print(name);
+    // s.print(" ");
 
-float TeensyPID::pOnMeasurement(float, float dInput)
-{
-    return -_kp * dInput;
-}
+    // if (mask & PRINT_INPUT)    { s.print("IN: ");  s.print(input);    s.print(" "); }
+    // if (mask & PRINT_OUTPUT)   { s.print("OUT: "); s.print(out);      s.print(" "); }
+    // if (mask & PRINT_SETPOINT) { s.print("SP: ");  s.print(setpoint); s.print(" "); }
+    // if (mask & PRINT_P)        { s.print("P: ");   s.print(_pOut);    s.print(" "); }
+    // if (mask & PRINT_I)        { s.print("I: ");   s.print(_iOut);    s.print(" "); }
+    // if (mask & PRINT_D)        { s.print("D: ");   s.print(_dOut);    s.print(" "); }
 
-float TeensyPID::dOnError(float dError, float)
-{
-    return -_kd * dError;
-}
-
-float TeensyPID::dOnMeasurement(float, float dInput)
-{
-    return -_kd * dInput;
-}
-
-// --- Accessors ---
-
-float TeensyPID::P() const { return _pOut; }
-float TeensyPID::I() const { return _iOut; }
-float TeensyPID::D() const { return _dOut; }
-float TeensyPID::Bias() const { return _bias; }
-
-// --- Debug ---
-
-void TeensyPID::debug(Stream& s,
-                      const char* name,
-                      uint8_t mask,
-                      float setpoint,
-                      float input,
-                      float output)
-{
-    s.print(name);
-    s.print(" ");
-
-    if (mask & PRINT_INPUT)    { s.print("IN: ");  s.print(input);    s.print(" "); }
-    if (mask & PRINT_OUTPUT)   { s.print("OUT: "); s.print(output);   s.print(" "); }
-    if (mask & PRINT_SETPOINT) { s.print("SP: ");  s.print(setpoint); s.print(" "); }
-    if (mask & PRINT_BIAS)     { s.print("B: ");   s.print(_bias);    s.print(" "); }
-    if (mask & PRINT_P)        { s.print("P: ");   s.print(_pOut);    s.print(" "); }
-    if (mask & PRINT_I)        { s.print("I: ");   s.print(_iOut);    s.print(" "); }
-    if (mask & PRINT_D)        { s.print("D: ");   s.print(_dOut);    s.print(" "); }
-
-    s.println();
+    // s.println();
 }
