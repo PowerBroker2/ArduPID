@@ -11,47 +11,53 @@ public:
 
     struct Config
     {
-        PMode        pMode;
-        DMode        dMode;
-        AntiWindMode aWMode;
-        Direction    direction;
+        char name[32] = "PID";
 
-        float pModeMix;
+        PMode        pMode     = P_ON_E;
+        DMode        dMode     = D_ON_M;
+        AntiWindMode aWMode    = NONE;
+        Direction    direction = FORWARD;
+
+        float pModeMix = 1.0;
     
-        uint32_t dt;
+        uint32_t dt  = 1e5;
+        float    dts = 0.1;
 
-        float kp;
-        float ki;
-        float kd;
-        float kaw;
+        float kp  = 0.0;
+        float ki  = 0.0;
+        float kd  = 0.0;
+        float kaw = 0.0;
 
-        float pMin;
-        float pMax;
-        float iMin;
-        float iMax;
-        float dMin;
-        float dMax;
+        float pMin = 0.0;
+        float pMax = 0.0;
+        float iMin = 0.0;
+        float iMax = 0.0;
+        float dMin = 0.0;
+        float dMax = 0.0;
 
-        float outMin;
-        float outMax;
+        float outMin = 0.0;
+        float outMax = 0.0;
     };
 
     struct Signals
     {
-        uint32_t prevT;
-        uint32_t currT;
+        uint32_t prevT = 0;
+        uint32_t currT = 0;
 
-        float error;
-        float prevError;
+        float error     = 0;
+        float prevError = 0;
+        float dError    = 0;
 
-        float input;
-        float prevInput;
+        float input     = 0;
+        float prevInput = 0;
+        float dInput    = 0;
 
-        float setpoint;
-        float out;
-        float p;
-        float i;
-        float d;
+        float setpoint = 0;
+        float out      = 0;
+
+        float p = 0;
+        float i = 0;
+        float d = 0;
     };
 
     // Debug masks
@@ -69,6 +75,8 @@ public:
 
     void reset();
 
+    void setConfig(const Config& _config);
+    void setName(const char* _name);
     void setTunings(float _kp, float _ki, float _kd);
     void setAntiWindupGain(float _kaw);
     void setPMode(PMode _pMode);
@@ -88,27 +96,17 @@ public:
 
     float compute(float _input);
 
-    float getkp()       const;
-    float getki()       const;
-    float getkd()       const;
-    float getP()        const;
-    float getI()        const;
-    float getD()        const;
-    float getInput()    const;
-    float getSetpoint() const;
-    float getOutput()   const;
-    float getDtUs()     const;
-    float getDtMs()     const;
-    float getDtS()      const;
+    Config  getConfig()  const;
+    Signals getSignals() const;
 
-    void debug(      Stream& stream,
-               const char*   name,
-                     uint16_t mask,
-                     float   setpoint,
-                     float   input,
-                     float   output);
+    void debug(uint16_t mask   = PRINT_SETPOINT | PRINT_OUTPUT,
+               Stream&  stream = Serial);
 
 private:
     Config  config;
     Signals signals;
+
+    void computeP();
+    void computeI();
+    void computeD();
 };
