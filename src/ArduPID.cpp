@@ -8,7 +8,23 @@ ArduPID::ArduPID()
 
 void ArduPID::reset()
 {
-    
+    // TODO: better handle kick due to reset
+    signals.error     = 0.0;
+    signals.prevError = 0.0;
+    signals.dError    = 0.0;
+
+    signals.input     = 0.0;
+    signals.prevInput = 0.0;
+    signals.dInput    = 0.0;
+
+    signals.p = 0.0;
+    signals.i = 0.0;
+    signals.d = 0.0;
+
+    signals.out = 0.0;
+
+    signals.prevT = micros();
+    signals.currT = signals.prevT;
 }
 
 void ArduPID::setConfig(const Config& _config)
@@ -111,33 +127,40 @@ void ArduPID::setDLimits(float min, float max)
 
 void ArduPID::setDirection(Direction dir)
 {
-    config.direction = dir;
-    signals.p        = 0;
-    signals.i        = 0;
-    signals.d        = 0;
+    if (config.direction != dir)
+    {
+        config.direction = dir;
+        reset();
+    }
 }
 
 void ArduPID::setDtUs(uint32_t _dt)
 {
-    config.dt  = _dt;
-    config.dts = (float)config.dt / 1e6;
+    if (config.dt != _dt)
+    {
+        config.dt  = _dt;
+        config.dts = (float)config.dt / 1e6;
+        reset();
+    }
 }
 
 void ArduPID::setDtMs(float _dt)
 {
-    if (_dt > 0)
+    if ((_dt > 0) && (config.dt != (uint32_t)(_dt * 1e3)))
     {
         config.dt  = _dt * 1e3;
         config.dts = (float)config.dt / 1e6;
+        reset();
     }
 }
 
 void ArduPID::setDtS(float _dt)
 {
-    if (_dt > 0)
+    if ((_dt > 0) && (config.dt != (uint32_t)(_dt * 1e6)))
     {
         config.dt  = _dt * 1e6;
         config.dts = (float)config.dt / 1e6;
+        reset();
     }
 }
 
