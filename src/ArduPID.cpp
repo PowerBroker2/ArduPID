@@ -162,10 +162,13 @@ void ArduPID::computeI()
 {
     signals.i += config.direction * config.ki * config.dts * signals.error;
 
-    if (config.aWMode == AntiWindMode::BACK_CALC)
+    if ((config.aWMode == AntiWindMode::BACK_CALC) && (config.outMin != config.outMax))
     {
-        float dActuator = signals.out - signals.input;
-        signals.i -= config.direction * config.kaw * config.dts * dActuator;
+        float outunsat  = signals.p + signals.i + signals.d;
+        float outsat    = constrain_val(outunsat, config.outMin, config.outMax);
+        float dActuator = outunsat - outsat;
+        
+        signals.i -= config.direction * config.kaw * dActuator;
     }
     else if (config.aWMode == AntiWindMode::CLEGG)
     {
@@ -205,8 +208,8 @@ float ArduPID::compute(float input)
     signals.dError = signals.error    - signals.prevError;
 
     computeP();
-    computeI();
     computeD();
+    computeI(); // Compute I last to make back-calc anti-windup easier to implement
     
     signals.out = signals.p + signals.i + signals.d;
 
