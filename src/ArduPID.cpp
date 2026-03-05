@@ -112,6 +112,9 @@ void ArduPID::setDLimits(float min, float max)
 void ArduPID::setDirection(Direction dir)
 {
     config.direction = dir;
+    signals.p        = 0;
+    signals.i        = 0;
+    signals.d        = 0;
 }
 
 void ArduPID::setDtUs(uint32_t _dt)
@@ -147,9 +150,9 @@ void ArduPID::computeP()
 {
     // TODO: incorporate mode mixing
     if (config.pMode == PMode::P_ON_E)
-        signals.p = config.kp * signals.error;
+        signals.p = config.direction * config.kp * signals.error;
     else
-        signals.p -= config.kp * signals.dInput;
+        signals.p -= config.direction * config.kp * signals.dInput;
     
     if (config.pMin != config.pMax)
         signals.p = constrain_val(signals.p, config.pMin, config.pMax);
@@ -157,12 +160,12 @@ void ArduPID::computeP()
 
 void ArduPID::computeI()
 {
-    signals.i += config.ki * config.dts * signals.error;
+    signals.i += config.direction * config.ki * config.dts * signals.error;
 
     if (config.aWMode == AntiWindMode::BACK_CALC)
     {
         float dActuator = signals.out - signals.input;
-        signals.i -= config.kaw * config.dts * dActuator;
+        signals.i -= config.direction * config.kaw * config.dts * dActuator;
     }
     else if (config.aWMode == AntiWindMode::CLEGG)
     {
@@ -179,9 +182,9 @@ void ArduPID::computeI()
 void ArduPID::computeD()
 {
     if (config.dMode == DMode::D_ON_E)
-        signals.d = -(config.kd / config.dts) * signals.dError;
+        signals.d = -((config.direction * config.kd) / config.dts) * signals.dError;
     else
-        signals.d = -(config.kd / config.dts) * signals.dInput;
+        signals.d = -((config.direction * config.kd) / config.dts) * signals.dInput;
 
     if (config.dMin != config.dMax)
         signals.d = constrain_val(signals.d, config.dMin, config.dMax);
